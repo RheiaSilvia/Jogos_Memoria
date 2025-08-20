@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Velha</title>
+    <!-- Inclui o Tailwind CSS para um design responsivo e moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilo personalizado para a grade e células do jogo */
+        .cell {
+            width: 100px;
+            height: 100px;
+            background-color: #334155;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+        }
+
+        .cell:hover {
+            background-color: #475569;
+        }
+
+        .cell:active {
+            transform: scale(0.95);
+        }
+
+        /* Estilo para o tabuleiro com uma proporção fixa */
+        .board {
+            width: 306px; /* 3 * 100px cells + 2 * 3px gap */
+            height: 306px;
+        }
+
+        /* Classes para os marcadores X e O */
+        .cell.X {
+            color: #ef4444; /* Vermelho */
+        }
+
+        .cell.O {
+            color: #3b82f6; /* Azul */
+        }
+
+        /* Adicionando a fonte Inter para todo o corpo */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 flex items-center justify-center min-h-screen p-4">
+    <div class="container mx-auto p-8 bg-slate-800 rounded-2xl shadow-xl max-w-md text-center">
+        <h1 class="text-4xl font-extrabold mb-4 text-emerald-400">Jogo da Velha</h1>
+        
+        <!-- Contêiner para o placar e o botão de anúncio, lado a lado -->
+        <div class="flex items-center justify-between mb-4">
+            <!-- Placar de pontuação com cor verde -->
+            <h2 class="text-lg font-semibold text-emerald-400">Pontuação: <span id="score-display">0</span></h2>
+            
+            <!-- Botão de Anúncio Premiado -->
+            <button id="ad-button" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 text-sm">
+                Anúncio Premiado
+            </button>
+        </div>
+
+        <!-- Botões de seleção de modo de jogo -->
+        <div class="mb-4">
+            <h2 class="text-lg font-semibold mb-2 text-slate-300">Modo de Jogo</h2>
+            <div class="flex justify-center space-x-4">
+                <button id="mode-vs-player" class="px-4 py-2 rounded-full font-bold text-sm bg-slate-700 hover:bg-slate-600 transition-colors">Jogador vs Jogador</button>
+                <button id="mode-vs-computer" class="px-4 py-2 rounded-full font-bold text-sm bg-emerald-500 hover:bg-emerald-600 transition-colors">Jogador vs Computador</button>
+            </div>
+        </div>
+
+        <!-- Botões de dificuldade (sem os pontos no label) -->
+        <div id="difficulty-buttons" class="mb-4">
+            <h2 class="text-lg font-semibold mb-2 text-slate-300">Dificuldade</h2>
+            <div class="flex justify-center space-x-4">
+                <button id="difficulty-easy" class="px-4 py-2 rounded-full font-bold text-sm bg-emerald-500 hover:bg-emerald-600 transition-colors">Fácil</button>
+                <button id="difficulty-moderate" class="px-4 py-2 rounded-full font-bold text-sm bg-slate-700 hover:bg-slate-600 transition-colors">Moderado</button>
+                <button id="difficulty-hard" class="px-4 py-2 rounded-full font-bold text-sm bg-slate-700 hover:bg-slate-600 transition-colors">Difícil</button>
+            </div>
+        </div>
+
+        <div id="game-message" class="text-xl mb-4 font-semibold">Vez do jogador X</div>
+        <div id="game-board" class="board grid grid-cols-3 gap-1 mx-auto rounded-xl overflow-hidden mb-6">
+            <button id="0" class="cell rounded-lg"></button>
+            <button id="1" class="cell rounded-lg"></button>
+            <button id="2" class="cell rounded-lg"></button>
+            <button id="3" class="cell rounded-lg"></button>
+            <button id="4" class="cell rounded-lg"></button>
+            <button id="5" class="cell rounded-lg"></button>
+            <button id="6" class="cell rounded-lg"></button>
+            <button id="7" class="cell rounded-lg"></button>
+            <button id="8" class="cell rounded-lg"></button>
+        </div>
+        <button id="restart-button" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105">
+            Reiniciar Jogo
+        </button>
+    </div>
+
+    <script>
+        // Lógica do jogo
+        const board = ['', '', '', '', '', '', '', '', ''];
+        let currentPlayer = 'X';
+        let isGameActive = true;
+        let gameMode = 'player-vs-computer'; // 'player-vs-player' ou 'player-vs-computer'
+        let difficultyLevel = 'easy'; // 'easy', 'moderate', 'hard'
+        let score = 0;
+
+        const cells = document.querySelectorAll('.cell');
+        const messageElement = document.getElementById('game-message');
+        const restartButton = document.getElementById('restart-button');
+        const modeVsPlayerButton = document.getElementById('mode-vs-player');
+        const modeVsComputerButton = document.getElementById('mode-vs-computer');
+        const difficultyButtonsContainer = document.getElementById('difficulty-buttons');
+        const difficultyButtons = document.querySelectorAll('#difficulty-buttons button');
+        const scoreDisplay = document.getElementById('score-display');
+        const adButton = document.getElementById('ad-button');
+
+        // Pontos por nível de dificuldade
+        const difficultyPoints = {
+            'easy': 1,
+            'moderate': 2,
+            'hard': 3
+        };
+
+        // Combinações vencedoras
+        const winningConditions = [
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],
+            [0, 4, 8],
+            [2, 4, 6]
+        ];
+
+        // Função para atualizar a mensagem de status do jogo
+        const updateMessage = (text) => {
+            messageElement.innerText = text;
+        };
+
+        // Função para atualizar a interface
+        const renderBoard = () => {
+            cells.forEach((cell, index) => {
+                cell.innerText = board[index];
+                cell.classList.remove('X', 'O');
+                if (board[index]) {
+                    cell.classList.add(board[index]);
+                }
+            });
+        };
+
+        // Função para atualizar o placar
+        const updateScoreDisplay = () => {
+            scoreDisplay.innerText = score;
+        };
+
+        // Função para verificar se há um vencedor ou um empate
+        const checkResult = () => {
+            let roundWon = false;
+            for (let i = 0; i < winningConditions.length; i++) {
+                const winCondition = winningConditions[i];
+                const a = board[winCondition[0]];
+                const b = board[winCondition[1]];
+                const c = board[winCondition[2]];
+                if (a === '' || b === '' || c === '') {
+                    continue;
+                }
+                if (a === b && b === c) {
+                    roundWon = true;
+                    break;
+                }
+            }
+
+            if (roundWon) {
+                updateMessage(`Parabéns! O jogador ${currentPlayer} venceu!`);
+                isGameActive = false;
+                // Adiciona pontos se o jogador 'X' vence no modo contra o computador
+                if (gameMode === 'player-vs-computer' && currentPlayer === 'X') {
+                    score += difficultyPoints[difficultyLevel];
+                    updateScoreDisplay();
+                }
+                return true;
+            }
+
+            // Verifica se houve empate (todas as células preenchidas)
+            if (!board.includes('')) {
+                updateMessage('Empate!');
+                isGameActive = false;
+                return true;
+            }
+
+            return false;
+        };
+
+        // Lógica de jogada do computador baseada no nível de dificuldade
+        const handleComputerMove = () => {
+            if (!isGameActive || currentPlayer !== 'O') {
+                return;
+            }
+
+            let moveIndex;
+
+            switch (difficultyLevel) {
+                case 'easy':
+                    moveIndex = getEasyMove();
+                    break;
+                case 'moderate':
+                    moveIndex = getModerateMove();
+                    break;
+                case 'hard':
+                    moveIndex = getHardMove();
+                    break;
+            }
+
+            if (moveIndex !== undefined) {
+                makeMove(moveIndex);
+            }
+        };
+
+        // IA Nível Fácil: joga aleatoriamente
+        const getEasyMove = () => {
+            const emptyCells = board.map((cell, index) => cell === '' ? index : null).filter(index => index !== null);
+            if (emptyCells.length > 0) {
+                const randomIndex = Math.floor(Math.random() * emptyCells.length);
+                return emptyCells[randomIndex];
+            }
+            return undefined;
+        };
+
+        // IA Nível Moderado: bloqueia o jogador, mas não planeja para vencer
+        const getModerateMove = () => {
+            // 1. Tenta bloquear a jogada vencedora do oponente
+            for (const condition of winningConditions) {
+                const [a, b, c] = condition;
+                if (board[a] === 'X' && board[b] === 'X' && board[c] === '') { return c; }
+                if (board[a] === 'X' && board[b] === '' && board[c] === 'X') { return b; }
+                if (board[a] === '' && board[b] === 'X' && board[c] === 'X') { return a; }
+            }
+
+            // 2. Tenta pegar o centro
+            if (board[4] === '') { return 4; }
+
+            // 3. Tenta pegar um canto
+            const corners = [0, 2, 6, 8];
+            const availableCorners = corners.filter(index => board[index] === '');
+            if (availableCorners.length > 0) {
+                return availableCorners[Math.floor(Math.random() * availableCorners.length)];
+            }
+            
+            // 4. Joga aleatoriamente em qualquer célula disponível
+            return getEasyMove();
+        };
+
+        // IA Nível Difícil: tenta vencer e bloquear de forma otimizada
+        const getHardMove = () => {
+            // 1. Tenta encontrar uma jogada vencedora para a IA
+            for (const condition of winningConditions) {
+                const [a, b, c] = condition;
+                if (board[a] === 'O' && board[b] === 'O' && board[c] === '') { return c; }
+                if (board[a] === 'O' && board[b] === '' && board[c] === 'O') { return b; }
+                if (board[a] === '' && board[b] === 'O' && board[c] === 'O') { return a; }
+            }
+
+            // 2. Tenta bloquear a jogada vencedora do oponente
+            for (const condition of winningConditions) {
+                const [a, b, c] = condition;
+                if (board[a] === 'X' && board[b] === 'X' && board[c] === '') { return c; }
+                if (board[a] === 'X' && board[b] === '' && board[c] === 'X') { return b; }
+                if (board[a] === '' && board[b] === 'X' && board[c] === 'X') { return a; }
+            }
+
+            // 3. Tenta pegar o centro
+            if (board[4] === '') { return 4; }
+
+            // 4. Tenta pegar um canto
+            const corners = [0, 2, 6, 8];
+            const availableCorners = corners.filter(index => board[index] === '');
+            if (availableCorners.length > 0) {
+                return availableCorners[Math.floor(Math.random() * availableCorners.length)];
+            }
+
+            // 5. Joga aleatoriamente em qualquer célula disponível
+            return getEasyMove();
+        };
+
+        // Função que realiza uma jogada e atualiza o estado
+        const makeMove = (index) => {
+            if (isGameActive && board[index] === '') {
+                board[index] = currentPlayer;
+                renderBoard();
+
+                if (!checkResult()) {
+                    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+                    updateMessage(`Vez do jogador ${currentPlayer}`);
+                }
+            }
+        };
+
+        // Função que lida com o clique em uma célula
+        const handleCellClick = (e) => {
+            const clickedCellIndex = parseInt(e.target.id);
+
+            if (board[clickedCellIndex] === '' && isGameActive) {
+                // Se for modo vs computador, só permite o jogador 'X' jogar
+                if (gameMode === 'player-vs-computer' && currentPlayer !== 'X') {
+                    return;
+                }
+                
+                makeMove(clickedCellIndex);
+
+                // Chama a jogada do computador após a jogada do jogador
+                if (isGameActive && gameMode === 'player-vs-computer') {
+                    // Espera um pouco para a jogada do computador
+                    setTimeout(() => {
+                        handleComputerMove();
+                    }, 500);
+                }
+            }
+        };
+
+        // Função para reiniciar o jogo
+        const restartGame = () => {
+            isGameActive = true;
+            currentPlayer = 'X';
+            board.fill('');
+            renderBoard();
+            updateMessage(`Vez do jogador ${currentPlayer}`);
+        };
+
+        // Função para mudar o modo de jogo
+        const handleModeChange = (mode) => {
+            gameMode = mode;
+            restartGame();
+
+            // Atualiza o estilo dos botões de modo
+            modeVsPlayerButton.classList.remove('bg-emerald-500', 'hover:bg-emerald-600', 'text-white');
+            modeVsPlayerButton.classList.add('bg-slate-700', 'hover:bg-slate-600');
+            modeVsComputerButton.classList.remove('bg-emerald-500', 'hover:bg-emerald-600', 'text-white');
+            modeVsComputerButton.classList.add('bg-slate-700', 'hover:bg-slate-600');
+
+            if (mode === 'player-vs-player') {
+                modeVsPlayerButton.classList.add('bg-emerald-500', 'hover:bg-emerald-600', 'text-white');
+                difficultyButtonsContainer.classList.add('hidden');
+            } else {
+                modeVsComputerButton.classList.add('bg-emerald-500', 'hover:bg-emerald-600', 'text-white');
+                difficultyButtonsContainer.classList.remove('hidden');
+            }
+        };
+
+        // Função para mudar o nível de dificuldade
+        const handleDifficultyChange = (level) => {
+            difficultyLevel = level;
+            restartGame();
+
+            // Atualiza o estilo dos botões de dificuldade
+            difficultyButtons.forEach(button => {
+                button.classList.remove('bg-emerald-500', 'hover:bg-emerald-600', 'text-white');
+                button.classList.add('bg-slate-700', 'hover:bg-slate-600');
+            });
+            document.getElementById(`difficulty-${level}`).classList.remove('bg-slate-700', 'hover:bg-slate-600');
+            document.getElementById(`difficulty-${level}`).classList.add('bg-emerald-500', 'hover:bg-emerald-600', 'text-white');
+        };
+
+        // Função para simular o anúncio premiado
+        const watchRewardedAd = () => {
+            if (isGameActive) {
+                updateMessage("Você só pode assistir um anúncio quando o jogo terminar.");
+                return;
+            }
+
+            adButton.disabled = true;
+            updateMessage("Carregando anúncio premiado...");
+            
+            setTimeout(() => {
+                score += 3;
+                updateScoreDisplay();
+                updateMessage("Parabéns! Você ganhou 3 pontos. Jogue novamente!");
+                adButton.disabled = false;
+            }, 3000); // Simula 3 segundos de anúncio
+        };
+
+
+        // Adiciona os event listeners
+        cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+        restartButton.addEventListener('click', restartGame);
+        modeVsPlayerButton.addEventListener('click', () => handleModeChange('player-vs-player'));
+        modeVsComputerButton.addEventListener('click', () => handleModeChange('player-vs-computer'));
+        difficultyButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                handleDifficultyChange(e.target.id.replace('difficulty-', ''));
+            });
+        });
+        adButton.addEventListener('click', watchRewardedAd);
+
+        // Inicializa o jogo com o modo vs computador e dificuldade fácil
+        handleModeChange('player-vs-computer');
+        handleDifficultyChange('easy');
+        updateScoreDisplay();
+    </script>
+</body>
+</html>
